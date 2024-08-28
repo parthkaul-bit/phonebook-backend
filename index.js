@@ -6,6 +6,7 @@ require("dotenv").config();
 
 app.use(cors());
 app.use(express.json());
+app.use(express.static("dist"));
 
 // app.use(morgan(":method :url :body"));
 
