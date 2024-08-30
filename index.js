@@ -1,8 +1,9 @@
 const express = require("express");
 const app = express();
-const morgan = require("morgan");
+// const morgan = require("morgan");
 const cors = require("cors");
 require("dotenv").config();
+const Person = require("./models/person");
 
 app.use(cors());
 app.use(express.json());
@@ -34,28 +35,39 @@ let persons = [
 ];
 
 app.get("/api/persons", (request, response) => {
-  response.json(persons);
+  Person.find({}).then((people) => {
+    response.json(people);
+  });
 });
 
-app.get("/api/persons/:id", (request, response) => {
+app.get("/api/persons/:id", (request, response, next) => {
   const id = request.params.id;
-  const person = persons.find((person) => person.id === id);
 
-  if (person) {
-    response.json(person);
-  } else {
-    response.status(404).send("Not Found");
-  }
+  Person.findById(id)
+    .then((person) => {
+      response.json(person);
+      // console.log(person);
+    })
+    .catch((error) => next(error));
+
+  // const person = persons.find((person) => person.id === id);
+
+  // if (person) {
+  //   response.json(person);
+  // } else {
+  //   response.status(404).send("Not Found");
+  // }
 });
 
-app.get("/info", (request, response) => {
-  let people = persons.length;
-  const time = new Date();
-  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  response.send(`
-      <p>Phonebook has info for ${people} people</p>
-      <p>${time.toLocaleString("en-GB")} ${timeZone}</p>
-    `);
+app.get("/info", (request, response, next) => {
+  Person.countDocuments({}).then((count) => {
+    const time = new Date();
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    response.send(`
+          <p>Phonebook has info for ${count} people</p>
+          <p>${time.toLocaleString("en-GB")} ${timeZone}</p>
+        `);
+  });
 });
 
 app.post("/api/persons/", (request, response) => {
@@ -74,22 +86,50 @@ app.post("/api/persons/", (request, response) => {
     });
   }
 
-  const person = {
+  const person = new Person({
     name,
     number,
-    id: Math.floor(Math.random() * 10000).toString(),
-  };
+  });
 
-  persons = persons.concat(person);
+  person
+    .save()
+    .then((savedPerson) => {
+      response.status(201).json(savedPerson);
+    })
+    .catch((error) => {
+      if (error.name === "ValidationError") {
+        response.status(400).json({ error: error.message });
+      }
+    });
+  // persons = persons.concat(person);
   // morgan.token("body", (request) => JSON.stringify(request.body));
-  return response.status(201).json(persons);
+  // return response.status(201).json(persons);
 });
 
-app.delete("/api/persons/:id", (request, response) => {
+app.delete("/api/persons/:id", (request, response, next) => {
   const id = request.params.id;
-  persons = persons.filter((person) => person.id !== id);
 
-  response.json(persons);
+  Person.findByIdAndDelete(id)
+    .then(() => {
+      response.status(204).end();
+    })
+    .catch((error) => next(error));
+
+  // persons = persons.filter((person) => person.id !== id);
+  // response.json(persons);
+});
+
+app.put("/api/persons/:id", (request, response, next) => {
+  const person = {
+    name: request.body.name,
+    number: request.body.number,
+  };
+
+  Person.findByIdAndUpdate(request.params.id, person, { new: true })
+    .then((updatedPerson) => {
+      response.json(updatedPerson);
+    })
+    .catch((error) => next(error));
 });
 
 const PORT = 3001;
